@@ -12,8 +12,10 @@ import com.tencent.angel.model.{MatrixSaveContext, ModelSaveContext}
 import com.tencent.angel.ps.storage.partitioner.Partitioner
 import com.tencent.angel.spark.context.AngelPSContext
 import com.tencent.angel.spark.ml.psf.ftrl.ComputeW
+import com.tencent.angel.spark.ml.util.AutoPartitioner
 import com.tencent.angel.spark.models.PSMatrix
 import com.tencent.angel.spark.models.impl.PSMatrixImpl
+import org.apache.spark.rdd.RDD
 
 class FtrlFM(lambda1: Double, lambda2: Double, alpha: Double, beta: Double) extends Serializable {
 
@@ -41,6 +43,22 @@ class FtrlFM(lambda1: Double, lambda2: Double, alpha: Double, beta: Double) exte
 
     this.dim = dim
   }
+
+  def init(start: Long, end: Long, rowType: RowType, data: RDD[Vector], dim: Int,
+           partitioner: AutoPartitioner): Unit = {
+    val firstCtx = new MatrixContext(firstName, 3, start, end)
+    firstCtx.setRowType(rowType)
+    partitioner.partition(data, firstCtx)
+    first = init(firstCtx)
+
+    val secondCtx = new MatrixContext(secondName, dim * 3, start, end)
+    secondCtx.setRowType(rowType)
+    partitioner.partition(data, secondCtx)
+    second = init(secondCtx)
+
+    this.dim = dim
+  }
+
 
   /**
     * create the model with a matrix-context and init three PSVector

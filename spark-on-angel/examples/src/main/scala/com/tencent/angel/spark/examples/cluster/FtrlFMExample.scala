@@ -8,7 +8,7 @@ import com.tencent.angel.spark.context.PSContext
 import com.tencent.angel.spark.ml.core.ArgsUtil
 import com.tencent.angel.spark.ml.core.metric.AUC
 import com.tencent.angel.spark.ml.online_learning.FtrlFM
-import com.tencent.angel.spark.ml.util.{DataLoader, SparkUtils}
+import com.tencent.angel.spark.ml.util.{DataLoader, LoadBalancePartitioner, SparkUtils}
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{SparkConf, SparkContext}
 
@@ -28,6 +28,10 @@ object FtrlFMExample {
     val output = params.getOrElse("output", "")
     val modelPath = params.getOrElse("model", "")
     val factor = params.getOrElse("factor", "5").toInt
+    val testInput = params.getOrElse("testInput", "").toString
+    val bits = params.getOrElse("bits", "20").toInt
+    val numPartitions = params.getOrElse("numPartitions", "100").toInt
+    val log = params.getOrElse("log", "").toString
 
     val conf = new SparkConf()
 
@@ -39,7 +43,7 @@ object FtrlFMExample {
     PSContext.getOrCreate(sc)
 
     val data = sc.textFile(input).filter(f => f.length > 0 && f != null)
-      .map(s => (DataLoader.parseIntFloat(s, dim), DataLoader.parseLabel(s, false)))
+      .map(s => (DataLoader.parseLongDummy(s, dim), DataLoader.parseLabel(s, false)))
       .map {
         f =>
           f._1.setY(f._2)
@@ -47,10 +51,10 @@ object FtrlFMExample {
       }.filter(f => f != null).filter(f => f.getX.getSize > 0)
 
     data.persist(StorageLevel.DISK_ONLY)
-    val parts = data.randomSplit(Array(0.9, 0.1))
-    val (train, test) = (parts(0), parts(1))
-    train.persist(StorageLevel.DISK_ONLY)
-    train.count()
+    //    val parts = data.randomSplit(Array(0.9, 0.1))
+    //    val (train, test) = (parts(0), parts(1))
+    //    train.persist(StorageLevel.DISK_ONLY)
+    //    train.count()
 
 
     val size = data.count()
@@ -62,35 +66,39 @@ object FtrlFMExample {
 
     val opt = new FtrlFM(lambda1, lambda2, alpha, beta)
 
-    val rowType = RowType.T_FLOAT_DENSE
+    val rowType = RowType.T_FLOAT_SPARSE_LONGKEY
 
-    opt.init(0, max+1, -1, rowType, factor, new ColumnRangePartitioner())
+    opt.init(0, max + 1,, rowType, data.map(f => f.getX), factor,new LoadBalancePartitioner(bits, numPartitions))
 
-    for (epoch <- 1 to numEpoch) {
-      val totalLoss = train.mapPartitions {
-        case iterator =>
-          val loss = iterator
-            .sliding(batchSize, batchSize)
-            .zipWithIndex
-            .map(f => opt.optimize(f._2, f._1.toArray)).sum
-          Iterator.single(loss)
-      }.sum()
+    val totalLoss = data.mapPartitions {
+      case iterator =>
+        val loss = iterator
+          .sliding(batchSize, batchSize)
+          .zipWithIndex
+          .map(f => opt.optimize(f._2, f._1.toArray)).sum
+        Iterator.single(loss)
+    }.sum()
 
-      val scores = test.mapPartitions {
-        case iterator =>
-          iterator.sliding(batchSize, batchSize)
-            .flatMap(f => opt.predict(f.toArray))
+    val test = sc.textFile(testInput)
+      .map(s => (DataLoader.parseLongDummy(s, dim), DataLoader.parseLabel(s, false)))
+      .map {
+        f =>
+          f._1.setY(f._2)
+          f._1
       }
-      val auc = new AUC().calculate(scores)
 
-      println(s"epoch=$epoch loss=${totalLoss / size} auc=$auc")
+    val scores = test.mapPartitions {
+      case iterator =>
+        iterator.sliding(batchSize, batchSize)
+          .flatMap(f => opt.predict(f.toArray))
     }
+    val auc = new AUC().calculate(scores)
+    println(s"loss=${totalLoss / size} auc=$auc")
 
-    if (output.length > 0) {
-      println(s"saving model to path $output")
-      opt.weight()
-      opt.saveWeight(output)
-    }
+
+    println(s"saving model to path $output")
+    opt.weight()
+    opt.saveWeight(output)
 
     PSContext.stop()
     SparkContext.getOrCreate().stop()
