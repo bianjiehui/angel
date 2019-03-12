@@ -40,7 +40,7 @@ class DeepFMTest extends PSFunSuite with SharedPSContext {
     SharedConf.get().setInt(MLConf.ML_FEATURE_INDEX_RANGE, 149)
     SharedConf.get().setDouble(MLConf.ML_LEARN_RATE, 0.02)
     SharedConf.get().set(MLConf.ML_DATA_INPUT_FORMAT, "libsvm")
-    SharedConf.get().setInt(MLConf.ML_EPOCH_NUM, 5)
+    SharedConf.get().setInt(MLConf.ML_EPOCH_NUM, 1)
     SharedConf.get().setDouble(MLConf.ML_VALIDATE_RATIO, 0.1)
     SharedConf.get().setDouble(MLConf.ML_REG_L2, 0.0)
     SharedConf.get().setDouble(MLConf.ML_BATCH_SAMPLE_RATIO, 0.2)
@@ -60,7 +60,8 @@ class DeepFMTest extends PSFunSuite with SharedPSContext {
     SharedConf.get().setLong(MLConf.ML_RANK_NUM, 5)
 
     val model = new DeepFM
-    learner.train(input, "", "", dim, model)
+    val modelOutput = "/Users/jeffreybian/Documents/java/jeffreybian/angel/data/model"
+    learner.train(input, "../../data/model", "", dim, model)
 
   }
 

@@ -23,6 +23,9 @@ import com.tencent.angel.conf.AngelConf
 import com.tencent.angel.ml.core.conf.{MLConf, SharedConf}
 import com.tencent.angel.spark.context.PSContext
 import com.tencent.angel.spark.ml.core.{ArgsUtil, GraphModel, OfflineLearner}
+import com.tencent.angel.spark.ml.classification.DeepFM
+import com.tencent.angel.spark.ml.core.metric.AUC
+import com.tencent.angel.spark.ml.util.DataLoader
 import org.apache.spark.{SparkConf, SparkContext}
 
 object OfflineRunner {
@@ -33,8 +36,9 @@ object OfflineRunner {
     val input = params.getOrElse("input", "")
     val output = params.getOrElse("output", "")
     val actionType = params.getOrElse("actionType", "train")
-    val network = params.getOrElse("network", "LogisticRegression")
+    val network = params.getOrElse("network", "DeepFM")
     val modelPath = params.getOrElse("model", "")
+    val testInput = params.getOrElse("testInput", "")
 
     // set running mode, use angel_ps mode for spark
     SharedConf.get().set(AngelConf.ANGEL_RUNNING_MODE, RunningMode.ANGEL_PS.toString)
@@ -66,5 +70,17 @@ object OfflineRunner {
       case MLConf.ANGEL_ML_TRAIN => learner.train(input, output, modelPath, dim, model)
       case MLConf.ANGEL_ML_PREDICT => learner.predict(input, output, modelPath, dim, model)
     }
+
+    val testData = SparkContext.getOrCreate().textFile(testInput)
+      .map(f => (DataLoader.parseLongDummy(f, dim), DataLoader.parseLabel(f)))
+
+    val predicts = learner.predict(testData, model)
+    val scores = predicts.map(f => (f._1.toDouble, f._2))
+
+    val auc = new AUC().calculate(scores)
+
+    println(s"auc=$auc")
+
+
   }
 }

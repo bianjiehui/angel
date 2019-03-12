@@ -86,8 +86,10 @@ class FtrlFM(lambda1: Double, lambda2: Double, alpha: Double, beta: Double) exte
     val indices = batch.flatMap {
       case point =>
         point.getX match {
-          case intKey: IntKeyVector => intKey.getStorage
-            .asInstanceOf[IntKeyVectorStorage].getIndices
+//          case intKey: IntKeyVector => intKey.getStorage
+//            .asInstanceOf[IntKeyVectorStorage].getIndices
+          case longKey: LongKeyVector => longKey.getStorage
+            .asInstanceOf[LongKeyVectorStorage].getIndices
         }
     }.distinct
 
@@ -175,8 +177,10 @@ class FtrlFM(lambda1: Double, lambda2: Double, alpha: Double, beta: Double) exte
     val indices = batch.flatMap {
       case point =>
         point.getX match {
-          case intKey: IntKeyVector => intKey.getStorage
-            .asInstanceOf[IntKeyVectorStorage].getIndices
+//          case intKey: IntKeyVector => intKey.getStorage
+//            .asInstanceOf[IntKeyVectorStorage].getIndices
+          case longKey: LongKeyVector => longKey.getStorage
+            .asInstanceOf[LongKeyVectorStorage].getIndices
         }
     }.distinct
 

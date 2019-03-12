@@ -1,7 +1,7 @@
 package com.tencent.angel.spark.examples.cluster
 
 import com.tencent.angel.conf.AngelConf
-import com.tencent.angel.ml.math2.vector.IntFloatVector
+import com.tencent.angel.ml.math2.vector.{IntFloatVector, LongFloatVector}
 import com.tencent.angel.ml.matrix.RowType
 import com.tencent.angel.ps.storage.partitioner.ColumnRangePartitioner
 import com.tencent.angel.spark.context.PSContext
@@ -58,9 +58,11 @@ object FtrlFMExample {
 
 
     val size = data.count()
-
-    val max = data.map(f => f.getX.asInstanceOf[IntFloatVector].getStorage().getIndices.max.toLong).max()
-    val min = data.map(f => f.getX.asInstanceOf[IntFloatVector].getStorage().getIndices.min.toLong).min()
+//    val size = 52161087
+//    val max = data.map(f => f.getX.asInstanceOf[LongFloatVector].getStorage().getIndices.max).max()
+//    val min = data.map(f => f.getX.asInstanceOf[LongFloatVector].getStorage().getIndices.min).min()
+    val max = 185210504185605061L
+    val min = 28428972993545598L
 
     println(s"num examples = ${size} min_index=$min max_index=$max")
 
@@ -68,7 +70,7 @@ object FtrlFMExample {
 
     val rowType = RowType.T_FLOAT_SPARSE_LONGKEY
 
-    opt.init(0, max + 1,, rowType, data.map(f => f.getX), factor,new LoadBalancePartitioner(bits, numPartitions))
+    opt.init(0, max + 1, rowType, data.map(f => f.getX), factor,new LoadBalancePartitioner(bits, numPartitions))
 
     val totalLoss = data.mapPartitions {
       case iterator =>
@@ -95,10 +97,12 @@ object FtrlFMExample {
     val auc = new AUC().calculate(scores)
     println(s"loss=${totalLoss / size} auc=$auc")
 
+    if (output.length > 0) {
+      println(s"saving model to path $output")
+      opt.weight()
+      opt.saveWeight(output)
+    }
 
-    println(s"saving model to path $output")
-    opt.weight()
-    opt.saveWeight(output)
 
     PSContext.stop()
     SparkContext.getOrCreate().stop()

@@ -141,7 +141,7 @@ class OfflineLearner {
     val conf = SparkContext.getOrCreate().getConf
     val data = SparkContext.getOrCreate().textFile(input)
       .repartition(SparkUtils.getNumCores(conf))
-      .map(f => DataLoader.parseIntFloat(f, dim))
+      .map(f => DataLoader.parseLongDummy(f, dim))
 
     model.init(data.getNumPartitions)
 
