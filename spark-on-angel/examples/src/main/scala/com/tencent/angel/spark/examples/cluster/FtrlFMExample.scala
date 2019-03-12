@@ -81,6 +81,7 @@ object FtrlFMExample {
         Iterator.single(loss)
     }.sum()
 
+
     val test = sc.textFile(testInput)
       .map(s => (DataLoader.parseLongDummy(s, dim), DataLoader.parseLabel(s, false)))
       .map {
@@ -100,6 +101,7 @@ object FtrlFMExample {
     if (output.length > 0) {
       println(s"saving model to path $output")
       opt.weight()
+      opt.save(output + "/back")
       opt.saveWeight(output)
     }
 
